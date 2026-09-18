@@ -546,21 +546,24 @@ if st.session_state.pagina == "home":
     st.subheader("Sports")
 
     # Ordine fisso per gli sport principali; tutti gli altri sport seguono
-    # dopo, ordinati per numero di uscite come prima.
+    # dopo, ordinati per numero di uscite come prima. Usiamo un confronto
+    # "contiene" (non uguaglianza esatta) perché Garmin può registrare lo
+    # stesso sport con chiavi leggermente diverse (es. "windsurfing",
+    # "wind_surfing_v2", ecc.).
     ORDINE_SPORT_PRIORITARI = [
-        "windsurfing",
-        "wind_surfing",
-        "e_bike_fitness",
-        "running",
-        "strength_training",
-        "golf",
+        ["wind", "surf"],
+        ["e_bike_fitness"],
+        ["running"],
+        ["strength_training", "weight_training", "fitness_equipment"],
+        ["golf"],
     ]
 
     def _priorita_sport(tipo):
-        try:
-            return ORDINE_SPORT_PRIORITARI.index(tipo)
-        except ValueError:
-            return len(ORDINE_SPORT_PRIORITARI)
+        tipo = str(tipo).lower()
+        for indice_priorita, parole_chiave in enumerate(ORDINE_SPORT_PRIORITARI):
+            if any(parola in tipo for parola in parole_chiave):
+                return indice_priorita
+        return len(ORDINE_SPORT_PRIORITARI)
 
     riepilogo_sport = (
         tabella.groupby("tipo")
