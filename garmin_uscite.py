@@ -424,9 +424,8 @@ def mostra_grafico_durata_mensile(sotto_tabella_sport):
         durata_mensile = df.groupby("mese")["durata_min"].sum().reindex(tutti_i_mesi, fill_value=0)
     durata_mensile.index = durata_mensile.index.strftime("%m/%Y")
 
-    st.markdown("#### ⏱️ Minuti totali per mese (ultimi 12 mesi)")
-    st.line_chart(durata_mensile)
-    st.divider()
+    with st.expander("⏱️ Minuti totali per mese (ultimi 12 mesi)"):
+        st.line_chart(durata_mensile)
 
 
 def crea_immagine_podio(classifica_top3):
@@ -479,10 +478,9 @@ def mostra_podio_distanza(sotto_tabella_sport):
     if top3.empty or top3["distanza_km"].sum() == 0:
         return
 
-    st.markdown("#### 🏆 Podio delle uscite più lunghe")
-    immagine = crea_immagine_podio(top3.to_dict("records"))
-    st.image(immagine)
-    st.divider()
+    with st.expander("🏆 Podio delle uscite più lunghe"):
+        immagine = crea_immagine_podio(top3.to_dict("records"))
+        st.image(immagine)
 
 
 def mostra_grafico_confronto(sotto_tabella_sport):
@@ -498,19 +496,18 @@ def mostra_grafico_confronto(sotto_tabella_sport):
     if storico.empty:
         return
 
-    st.markdown("#### 📊 Confronto con le altre uscite")
-    colonna_a, colonna_b = st.columns(2)
-    with colonna_a:
-        st.caption("Velocità massima (km/h)")
-        st.line_chart(storico.set_index("data")["velocita_max_kmh"])
-    with colonna_b:
-        st.caption("Numero di strambate")
-        st.line_chart(storico.set_index("data")["numero_strambate"])
-    st.caption(
-        "Calcolato sulle uscite più recenti (fino a 20), con i parametri di rilevamento "
-        "predefiniti — per un confronto equo tra uscite diverse."
-    )
-    st.divider()
+    with st.expander("📊 Confronto con le altre uscite"):
+        colonna_a, colonna_b = st.columns(2)
+        with colonna_a:
+            st.caption("Velocità massima (km/h)")
+            st.line_chart(storico.set_index("data")["velocita_max_kmh"])
+        with colonna_b:
+            st.caption("Numero di strambate")
+            st.line_chart(storico.set_index("data")["numero_strambate"])
+        st.caption(
+            "Calcolato sulle uscite più recenti (fino a 20), con i parametri di rilevamento "
+            "predefiniti — per un confronto equo tra uscite diverse."
+        )
 
 
 st.title("🚴 Le mie uscite")
