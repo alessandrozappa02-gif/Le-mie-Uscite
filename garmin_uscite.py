@@ -539,6 +539,30 @@ def vai_a_dettaglio(activity_id):
     st.session_state.attivita_scelta = activity_id
 
 
+def vai_a_mappa_generale(tipo):
+    st.session_state.pagina = "mappa_generale"
+    st.session_state.sport_scelto = tipo
+    st.session_state.attivita_scelta = None
+
+
+@st.cache_data(show_spinner="Scarico le tracce GPS di tutte le uscite...", ttl=600)
+def carica_tracce_multiple(id_e_date, limite=30):
+    """Scarica (o riusa dalla cache) i punti GPS delle uscite più recenti
+    di uno sport, per disegnarle tutte insieme su un'unica mappa generale.
+    Limitato alle uscite più recenti per non sovraccaricare Garmin di
+    richieste."""
+    tracce = []
+    for activity_id, _ in id_e_date[-limite:]:
+        try:
+            _, dettagli, _ = carica_dettaglio_attivita(activity_id)
+        except Exception:
+            continue
+        punti = estrai_punti_traccia(dettagli)
+        if punti:
+            tracce.append(punti)
+    return tracce
+
+
 # =========================================================
 # PAGINA 1 — HOME: un bottone per ogni sport
 # =========================================================
@@ -601,9 +625,14 @@ elif st.session_state.pagina == "elenco":
 
     sotto_tabella = tabella[tabella["tipo"] == sport].sort_values("data", ascending=False)
 
+    is_vela_o_foil_elenco = any(parola in str(sport).lower() for parola in PAROLE_CHIAVE_VELA_FOIL)
+    if is_vela_o_foil_elenco:
+        if st.button("🗺️ Mappa di tutte le uscite (Europa)"):
+            vai_a_mappa_generale(sport)
+            st.rerun()
+
     mostra_grafico_durata_mensile(sotto_tabella)
 
-    is_vela_o_foil_elenco = any(parola in str(sport).lower() for parola in PAROLE_CHIAVE_VELA_FOIL)
     if is_vela_o_foil_elenco:
         mostra_grafico_confronto(sotto_tabella)
 
@@ -629,6 +658,63 @@ elif st.session_state.pagina == "elenco":
                 if st.button("Dettagli →", key=f"btn_att_{riga['id']}", use_container_width=True):
                     vai_a_dettaglio(riga["id"])
                     st.rerun()
+
+# =========================================================
+# PAGINA 2bis — MAPPA GENERALE: tutti i tracciati di uno sport insieme
+# =========================================================
+elif st.session_state.pagina == "mappa_generale":
+    sport = st.session_state.sport_scelto
+
+    if st.button("← Torna all'elenco"):
+        vai_a_elenco(sport)
+        st.rerun()
+
+    st.subheader(f"🗺️ Mappa di tutte le uscite — {nome_sport_leggibile(sport)}")
+
+    sotto_tabella_mappa = tabella[tabella["tipo"] == sport]
+    id_e_date = tuple(
+        sorted((int(r["id"]), r["data"]) for _, r in sotto_tabella_mappa.iterrows())
+    )
+
+    if not id_e_date:
+        st.info("Nessuna uscita trovata per questo sport.")
+    else:
+        tracce = carica_tracce_multiple(id_e_date)
+        if not tracce:
+            st.info("Nessun dato GPS disponibile per le uscite di questo sport.")
+        else:
+            st.caption(
+                f"{len(tracce)} tracciati mostrati (le uscite più recenti, fino a 30 alla volta)."
+            )
+            mappa_disegnata = False
+            try:
+                import pydeck as pdk
+
+                percorsi = [
+                    {"path": [[p["lon"], p["lat"]] for p in traccia]} for traccia in tracce
+                ]
+                layer = pdk.Layer(
+                    "PathLayer",
+                    data=percorsi,
+                    get_path="path",
+                    get_width=3,
+                    get_color=[255, 90, 0],
+                    width_min_pixels=2,
+                )
+                tutti_punti = [
+                    {"lon": p["lon"], "lat": p["lat"]} for traccia in tracce for p in traccia
+                ]
+                vista = pdk.data_utils.compute_view(tutti_punti)
+                st.pydeck_chart(pdk.Deck(layers=[layer], initial_view_state=vista))
+                mappa_disegnata = True
+            except Exception:
+                mappa_disegnata = False
+
+            if not mappa_disegnata:
+                df_tutti_punti = pd.DataFrame(
+                    [{"lat": p["lat"], "lon": p["lon"]} for traccia in tracce for p in traccia]
+                )
+                st.map(df_tutti_punti)
 
 # =========================================================
 # PAGINA 3 — DETTAGLIO: tutti i dati tecnici di un'attività
