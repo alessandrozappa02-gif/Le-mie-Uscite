@@ -18,10 +18,15 @@ import bisect
 import math
 import os
 from datetime import date, timedelta
+from io import BytesIO
 
 import pandas as pd
 import streamlit as st
 from garminconnect import Garmin
+
+import matplotlib
+matplotlib.use("Agg")
+import matplotlib.pyplot as plt
 
 st.set_page_config(page_title="Le mie uscite", page_icon="🚴", layout="wide")
 
@@ -424,6 +429,62 @@ def mostra_grafico_durata_mensile(sotto_tabella_sport):
     st.divider()
 
 
+def crea_immagine_podio(classifica_top3):
+    """Disegna un podio (1°, 2°, 3°) come immagine, con lunghezza (km),
+    luogo e data delle uscite più lunghe. `classifica_top3` è una lista di
+    righe già ordinate dalla più lunga alla più corta (indice 0 = 1° posto).
+    """
+    # Ordine visivo classico del podio: 2° a sinistra, 1° al centro (più
+    # alto), 3° a destra.
+    ordine_posizioni = [1, 0, 2]
+    altezze = [2.0, 3.0, 1.3]
+    colori = ["#C0C0C0", "#FFD700", "#CD7F32"]
+    medaglie = ["🥈", "🥇", "🥉"]
+    centri_x = [0, 1, 2]
+
+    fig, ax = plt.subplots(figsize=(7, 4.8))
+    for slot, indice_classifica in enumerate(ordine_posizioni):
+        if indice_classifica >= len(classifica_top3):
+            continue
+        riga = classifica_top3[indice_classifica]
+        x = centri_x[slot]
+        h = altezze[slot]
+        ax.bar(x, h, width=0.6, color=colori[slot], edgecolor="#333333", zorder=2)
+        ax.text(x, h + 0.15, medaglie[slot], fontsize=30, ha="center", va="bottom")
+        ax.text(
+            x, h / 2, f"{indice_classifica + 1}°", fontsize=22, fontweight="bold",
+            ha="center", va="center", color="#333333",
+        )
+        testo = f"{riga['distanza_km']:.1f} km\n{riga['luogo']}\n{riga['data']}"
+        ax.text(x, -0.15, testo, fontsize=10, ha="center", va="top")
+
+    ax.set_xlim(-0.7, 2.7)
+    ax.set_ylim(-1.4, 4.1)
+    ax.axis("off")
+    fig.tight_layout()
+
+    buffer = BytesIO()
+    fig.savefig(buffer, format="png", dpi=150, bbox_inches="tight", transparent=True)
+    plt.close(fig)
+    buffer.seek(0)
+    return buffer
+
+
+def mostra_podio_distanza(sotto_tabella_sport):
+    """Mostra un podio con le 3 uscite più lunghe (in km) di questo sport:
+    lunghezza, luogo e data di ciascuna."""
+    if sotto_tabella_sport.empty:
+        return
+    top3 = sotto_tabella_sport.sort_values("distanza_km", ascending=False).head(3)
+    if top3.empty or top3["distanza_km"].sum() == 0:
+        return
+
+    st.markdown("#### 🏆 Podio delle uscite più lunghe")
+    immagine = crea_immagine_podio(top3.to_dict("records"))
+    st.image(immagine)
+    st.divider()
+
+
 def mostra_grafico_confronto(sotto_tabella_sport):
     """Mostra, in cima alla pagina, due grafici che confrontano la
     velocità massima e il numero di strambate di tutte le uscite di
@@ -493,6 +554,7 @@ for att in attivita_grezze:
             "id": att.get("activityId"),
             "data": (att.get("startTimeLocal") or "")[:10],
             "nome": att.get("activityName", ""),
+            "luogo": att.get("locationName") or trova_valore(att, "locationName") or "—",
             "tipo": tipo,
             "distanza_km": round((att.get("distance") or 0) / 1000, 2),
             "durata_min": round((att.get("duration") or 0) / 60, 1),
@@ -630,6 +692,8 @@ elif st.session_state.pagina == "elenco":
         if st.button("🗺️ Mappa di tutte le uscite (Europa)"):
             vai_a_mappa_generale(sport)
             st.rerun()
+
+        mostra_podio_distanza(sotto_tabella)
 
     mostra_grafico_durata_mensile(sotto_tabella)
 
