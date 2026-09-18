@@ -395,6 +395,35 @@ def calcola_storico_prestazioni(
     return pd.DataFrame(righe)
 
 
+def mostra_grafico_durata_mensile(sotto_tabella_sport):
+    """Mostra un grafico a linee con la durata totale (in minuti) delle
+    attività di questo sport, mese per mese, negli ultimi 12 mesi."""
+    if sotto_tabella_sport.empty:
+        return
+
+    df = sotto_tabella_sport.copy()
+    df["data_dt"] = pd.to_datetime(df["data"], errors="coerce")
+    df = df.dropna(subset=["data_dt"])
+    if df.empty:
+        return
+
+    oggi = pd.Timestamp(date.today())
+    dodici_mesi_fa = (oggi - pd.DateOffset(months=11)).replace(day=1)
+    df = df[df["data_dt"] >= dodici_mesi_fa]
+
+    tutti_i_mesi = pd.period_range(dodici_mesi_fa, oggi, freq="M")
+    if df.empty:
+        durata_mensile = pd.Series(0, index=tutti_i_mesi)
+    else:
+        df["mese"] = df["data_dt"].dt.to_period("M")
+        durata_mensile = df.groupby("mese")["durata_min"].sum().reindex(tutti_i_mesi, fill_value=0)
+    durata_mensile.index = durata_mensile.index.strftime("%m/%Y")
+
+    st.markdown("#### ⏱️ Minuti totali per mese (ultimi 12 mesi)")
+    st.line_chart(durata_mensile)
+    st.divider()
+
+
 def mostra_grafico_confronto(sotto_tabella_sport):
     """Mostra, in cima alla pagina, due grafici che confrontano la
     velocità massima e il numero di strambate di tutte le uscite di
@@ -568,6 +597,8 @@ elif st.session_state.pagina == "elenco":
     st.subheader(nome_sport_leggibile(sport))
 
     sotto_tabella = tabella[tabella["tipo"] == sport].sort_values("data", ascending=False)
+
+    mostra_grafico_durata_mensile(sotto_tabella)
 
     is_vela_o_foil_elenco = any(parola in str(sport).lower() for parola in PAROLE_CHIAVE_VELA_FOIL)
     if is_vela_o_foil_elenco:
