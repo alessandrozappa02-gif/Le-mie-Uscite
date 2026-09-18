@@ -101,6 +101,8 @@ ICONE_SPORT = {
     "walking": "🚶",
     "hiking": "🥾",
     "swimming": "🏊",
+    "strength_training": "🏋️",
+    "golf": "⛳",
 }
 
 # Parole che, se presenti nel tipo di attività, indicano uno sport di
@@ -512,14 +514,34 @@ def vai_a_dettaglio(activity_id):
 # PAGINA 1 — HOME: un bottone per ogni sport
 # =========================================================
 if st.session_state.pagina == "home":
-    st.subheader("Scegli uno sport")
+    st.subheader("Sports")
+
+    # Ordine fisso per gli sport principali; tutti gli altri sport seguono
+    # dopo, ordinati per numero di uscite come prima.
+    ORDINE_SPORT_PRIORITARI = [
+        "windsurfing",
+        "wind_surfing",
+        "e_bike_fitness",
+        "running",
+        "strength_training",
+        "golf",
+    ]
+
+    def _priorita_sport(tipo):
+        try:
+            return ORDINE_SPORT_PRIORITARI.index(tipo)
+        except ValueError:
+            return len(ORDINE_SPORT_PRIORITARI)
 
     riepilogo_sport = (
         tabella.groupby("tipo")
         .agg(numero_uscite=("id", "count"), km_totali=("distanza_km", "sum"))
         .reset_index()
-        .sort_values("numero_uscite", ascending=False)
     )
+    riepilogo_sport["_priorita"] = riepilogo_sport["tipo"].apply(_priorita_sport)
+    riepilogo_sport = riepilogo_sport.sort_values(
+        ["_priorita", "numero_uscite"], ascending=[True, False]
+    ).reset_index(drop=True)
 
     colonne = st.columns(3)
     for indice, riga in riepilogo_sport.iterrows():
