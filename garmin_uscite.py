@@ -34,22 +34,22 @@ CARTELLA_TOKEN = os.path.expanduser("~/.garminconnect")
 
 
 def prepara_token_da_secrets():
-    """Se l'app gira online (container "vuoto", senza il file di sessione
-    già presente sul disco) e nei Secrets di Streamlit è stato configurato
-    GARMIN_TOKENS_B64, ricrea il file di sessione al volo. Così l'app può
-    collegarsi a Garmin senza bisogno di rifare il login manuale a ogni
-    riavvio del server online. In locale (dove il file esiste già grazie a
-    garmin_login.py) questa funzione non fa nulla.
+    """Se nei Secrets di Streamlit è configurato GARMIN_TOKENS_B64, scrive
+    (o RIscrive) il file di sessione da lì. Importante: lo facciamo sempre,
+    non solo se il file manca — altrimenti, quando aggiorniamo il token nei
+    Secrets online (es. dopo un nuovo login), il container potrebbe avere
+    ancora sul disco un vecchio file di sessione da un avvio precedente e
+    continuerebbe a usare quello, ignorando l'aggiornamento. In locale
+    (dove normalmente non ci sono Secrets configurati) questa funzione non
+    fa nulla e resta valido il file creato da garmin_login.py.
     """
-    file_token = os.path.join(CARTELLA_TOKEN, "garmin_tokens.json")
-    if os.path.isfile(file_token):
-        return
     try:
         token_b64 = st.secrets.get("GARMIN_TOKENS_B64")
     except Exception:
         token_b64 = None
     if not token_b64:
         return
+    file_token = os.path.join(CARTELLA_TOKEN, "garmin_tokens.json")
     os.makedirs(CARTELLA_TOKEN, exist_ok=True)
     with open(file_token, "wb") as f:
         f.write(base64.b64decode(token_b64))
